@@ -2,12 +2,21 @@ library(e1071)
 library(rpart)
 library(ada)
 library(ggplot2)
+library(randomForest)
 
 ## we should do some data clean up. There's a guy with age 0 that we should probably take out of the set entirely
 ## when we look at cs.training$NumberOfTime30.59DaysPastDueNotWorse a value of 96/98 coded for some qualitative
-## quantity ("other", or "refused to say") and so we shoud clean these up because they skew the data.
-## should think of a way to weight observations where the person did default 
+## quantity ("other", or "refused to say") and so we shoud clean these up because they skew the data. The same corruption
+## is present in cs.training$NumberOfTime60.89DaysPastDueNotWorse and it also looks to be present in NumberOfTimes90DaysLate
+##
+## should think of a way to weight observations where the person did default since these obs. are under
+## represented in the data.
+table(cs.training$age)
+table(cs.training$NumberOfTime30.59DaysPastDueNotWorse)
+table(cs.training$NumberOfTimes90DaysLate)
 
+## Data imputation: we should impute all the data before we begin training/testing with it, 
+## so the sooner the better.
 
 # split data in half and sample from it. Our training/test data is all pulled from cs.training, each
 # subset representing about a quarter of the data in total
@@ -32,11 +41,10 @@ if (false) {
 
 
 ### random forest
-library(randomForest)
 # this will take a while
 rf.fit <- randomForest(SeriousDlqin2yrs~., data = train.sub, ntrees = 500)
 
-### boosting: as of now we are using weak classifiers in our boosting routine and only running for
+### Boosting: as of now we are using weak classifiers in our boosting routine and only running for
 ### 100 iterations. We may want to play around with the types of classifiers that we use here
 ### and may also want to play around with how long we let these guys run for.
 sixteen <- rpart.control(cp=-1,maxdepth=4,minsplit=0) #16-node tree
@@ -51,10 +59,15 @@ boost.stump <- ada(as.factor(SeriousDlqin2yrs)~., data=train.sub,
 boost.four <- ada(as.factor(SeriousDlqin2yrs)~., data=train.sub, 
                        type = "real", control = four, 
                        test.x = test.sub[, -1], test.y = test.sub[, 1], iter = 100)
+
 boost.eight <- ada(as.factor(SeriousDlqin2yrs)~., data=train.sub, 
                  type = "real", control = eight, 
                  test.x = test.sub[, -1], test.y = test.sub[, 1], iter = 100)
+
 boost.sixteen <- ada(as.factor(SeriousDlqin2yrs)~., data=train.sub, 
                        type = "real", control = sixteen, 
                        test.x = test.sub[, -1], test.y = test.sub[, 1], iter = 200)
-varplot(boost.fit)
+varplot(boost.stump)
+varplot(boost.four)
+varplot(boost.eight)
+varplot(boost.sixteen)
