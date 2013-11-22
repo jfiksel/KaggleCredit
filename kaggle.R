@@ -47,27 +47,32 @@ rf.fit <- randomForest(SeriousDlqin2yrs~., data = train.sub, ntrees = 500)
 ### Boosting: as of now we are using weak classifiers in our boosting routine and only running for
 ### 100 iterations. We may want to play around with the types of classifiers that we use here
 ### and may also want to play around with how long we let these guys run for.
-sixteen <- rpart.control(cp=-1,maxdepth=4,minsplit=0) #16-node tree
-eight <- rpart.control(cp=-1,maxdepth=3,minsplit=0) # 8-node tree
-four <- rpart.control(cp=-1,maxdepth=2,minsplit=0) # 4-node tree
-stump <- rpart.control(cp=-1,maxdepth=1,minsplit=0) # 2-node tree
+ttwo <- rpart.control(cp = -1, maxdepth=5, minsplit=1)
+sixteen <- rpart.control(cp=-1,maxdepth=4,minsplit=1) #16-node tree
+eight <- rpart.control(cp=-1,maxdepth=3,minsplit=1) # 8-node tree
+four <- rpart.control(cp=-1,maxdepth=2,minsplit=1) # 4-node tree
+stump <- rpart.control(cp=-1,maxdepth=1,minsplit=1) # 2-node tree
 
 boost.stump <- ada(as.factor(SeriousDlqin2yrs)~., data=train.sub, 
                        type = "real", control = stump, 
-                       test.x = test.sub[, -1], test.y = test.sub[, 1], iter = 100)
+                       test.x = test.sub[, -1], test.y = test.sub[, 1], iter = 200)
 
 boost.four <- ada(as.factor(SeriousDlqin2yrs)~., data=train.sub, 
                        type = "real", control = four, 
-                       test.x = test.sub[, -1], test.y = test.sub[, 1], iter = 100)
+                       test.x = test.sub[, -1], test.y = test.sub[, 1], iter = 200)
 
 boost.eight <- ada(as.factor(SeriousDlqin2yrs)~., data=train.sub, 
                  type = "real", control = eight, 
-                 test.x = test.sub[, -1], test.y = test.sub[, 1], iter = 100)
+                 test.x = test.sub[, -1], test.y = test.sub[, 1], iter = 200)
 
 boost.sixteen <- ada(as.factor(SeriousDlqin2yrs)~., data=train.sub, 
                        type = "real", control = sixteen, 
                        test.x = test.sub[, -1], test.y = test.sub[, 1], iter = 200)
 varplot(boost.stump)
+plot(boost.stump)
 varplot(boost.four)
+plot(boost.four)
 varplot(boost.eight)
+plot(boot.eight)
 varplot(boost.sixteen)
+plot(boost.sixteen)
