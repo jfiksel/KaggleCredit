@@ -26,19 +26,20 @@ p1
 
 ## We should impute all the data before we begin training/testing with it. 
 ## Here is a naive attempt that removes the offending observations from our data.
-## We choose to omit NA values as well.
+## We use a boosted regression tree imputation method
+temp <- cs.training[, -1] ##Gets rid of the "X" column
 temp <- cs.training[cs.training$age > 0, ] 
 temp <- temp[temp$NumberOfTime30.59DaysPastDueNotWorse < 20, ]
 temp <- temp[temp$NumberOfTimes90DaysLate < 90, ]
 temp <- temp[temp$NumberOfTime60.89DaysPastDueNotWorse < 90, ]
-naive.cleaned <- na.omit(temp)
+naive.cleaned <- gbmImpute(temp[, -1])$x ##Imputes data using everything except for the response
 n <- nrow(naive.cleaned)
 half.cleaned <- naive.cleaned[sample(n, n/1.5), ]
 
 # split data in half and sample from it.
 train.rows <- sample(nrow(half.cleaned), floor(nrow(half.cleaned)*0.8))
-train.set <- half.cleaned[train.rows, 2:ncol(half.cleaned)]
-test.set <- half.cleaned[-train.rows, 2:ncol(half.cleaned)]
+train.set <- half.cleaned[train.rows, 1:ncol(half.cleaned)]
+test.set <- half.cleaned[-train.rows, 1:ncol(half.cleaned)]
 
 ## proof we actally removed offending samples
 table(train.set$age)
@@ -62,10 +63,10 @@ p3
 ### SVM: these take a long time too. The first call to tune.svm is a cross-validation step
 ### so that we are using the optimal parameters to train with
 if (FALSE) {
-  tuned <- tune.svm(as.factor(SeriousDlqin2yrs)~., data = train.sub,
+  tuned <- tune.svm(as.factor(SeriousDlqin2yrs)~., data = train.set,
                     gamma = 10^(-6:2), cost = 10^(1:3), kernel="polynomial")
 
-  svm_fit <- svm(as.factor(SeriousDlqin2yrs)~., data = train.sub, method="C-classification", 
+  svm_fit <- svm(as.factor(SeriousDlqin2yrs)~., data = train.set, method="C-classification", 
                kernel="sigmoid",cross=10, cost=10, gamma=1e-4, probability=T)
 
   svm_predict <- as.vector(predict(svm_fit, newdata=cs.training[, 3:ncol(cs.test)]))
