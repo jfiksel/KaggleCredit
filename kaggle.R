@@ -28,15 +28,36 @@ p1
 ## We should impute all the data before we begin training/testing with it. 
 ## Here is a naive attempt that removes the offending observations from our data.
 ## We use a boosted regression tree imputation method
-temp <- cs.training[, -1] ##Gets rid of the "X" column
-temp <- cs.training[cs.training$age > 0, ] 
-temp <- temp[temp$NumberOfTime30.59DaysPastDueNotWorse < 90, ]
-temp <- temp[temp$NumberOfTimes90DaysLate < 90, ]
-temp <- temp[temp$NumberOfTime60.89DaysPastDueNotWorse < 90, ]
-## I think we *can* use the response in our imputation. We are training
-## on this, we might as well use all the information we have
-impute.cleaned <- gbmImpute(temp, cv.fold = 4)$x[ , -1]
-n <- nrow(naive.cleaned)
+all.obs <- rbind(cs.training, cs.test)[, -1] ##Gets rid of the "X" column
+View(all.obs)
+
+## make sure you demarkate factor variable
+# replace nonsense data with NA, to be filled in by imputation
+all.obs$age <- ifelse(all.obs$age == 0, NA, all.obs$age)
+all.obs$age <- as.factor(all.obs$age)
+
+
+all.obs$NumberOfTime30.59DaysPastDueNotWorse <- ifelse(all.obs$NumberOfTime30.59DaysPastDueNotWorse > 90,
+                                                       NA, all.obs$NumberOfTime30.59DaysPastDueNotWorse)
+all.obs$NumberOfTime30.59DaysPastDueNotWorse <- as.factor(all.obs$NumberOfTime30.59DaysPastDueNotWorse)
+
+
+all.obs$NumberOfTimes90DaysLate <- ifelse(all.obs$NumberOfTimes90DaysLate > 90, 
+                                          NA, all.obs$NumberOfTimes90DaysLate)
+all.obs$NumberOfTimes90DaysLate <- as.factor(all.obs$NumberOfTimes90DaysLate)
+
+all.obs$NumberOfTime60.89DaysPastDueNotWorse <- ifelse(all.obs$NumberOfTime60.89DaysPastDueNotWorse > 90,
+                                                       NA, all.obs$NumberOfTime60.89DaysPastDueNotWorse)
+all.obs$NumberOfTime60.89DaysPastDueNotWorse <- as.factor(all.obs$NumberOfTime60.89DaysPastDueNotWorse)
+
+
+
+impute.cleaned <- gbmImpute(all.obs[-1, ], cv.fold = 4, n.trees = 200, max.iters = 4)
+
+## after we impute, we should make one more pass over the data to fill in dependent
+## fields; i.e. some columns are dependent on other columns and we should update
+## accordingly after cleaning things up.
+n <- nrow(impute.cleaned)
 half.cleaned <- impute.cleaned[sample(n, n/1.5), ]
 
 # split data in half and sample from it.
@@ -99,3 +120,6 @@ plot(boost.eight)
 varplot(boost.sixteen)
 plot(boost.sixteen)
 
+pred <- predict(boost.four, cs.test[, -1], type = "probs")
+results <- data.frame(Id = 1:nrow(cs.test), Probability = pred[, 2])
+write.table(results, "derose.csv", quote=F, row.names=F, sep=",")
