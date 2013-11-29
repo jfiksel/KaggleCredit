@@ -6,110 +6,125 @@ library(ggplot2)
 library(randomForest)
 library(imputation)
 
-## Someone has age 0. We should take out of the set, unless we can come up 
-## good interpolation. NumberOfTime30.59DaysPastDueNotWorse 
-## contains "non-sense" data such as 96 and 98 use to code for some qualitative
-## quantity ("other", or "refused to say"). The same corruption is present in 
-## NumberOfTime60.89DaysPastDueNotWorse and NumberOfTimes90DaysLate
-## See tabulated values using the raw data from cs-training.csv
+Plot.Factor <- function(data) {
+  # Plot.Factor plots a histogram comparing the percent
+  # of our data that defaulted and the percent that did not.
+  p1 <- ggplot(data) + 
+    geom_bar(aes(x = factor(SeriousDlqin2yrs), y = ..count../sum(..count..))) + 
+    ylab("Percent") + xlab("Classification")
+  p1
+}
+
+Split.Data <-function(data) {
+  # Split.Data partitions a full dataset into two smaller
+  # ones that may be used for training/testing.
+  n <- nrow(data)
+  half.cleaned <- data[sample(n, n/1.5), ]
+  train.rows <- sample(nrow(half.cleaned), floor(nrow(half.cleaned)*0.8))
+  train.set <- half.cleaned[train.rows, 1:ncol(half.cleaned)]
+  test.set <- half.cleaned[-train.rows, 1:ncol(half.cleaned)]
+  return(list("train" = train.set, "test" = test.set))
+}
+
+# Someone has age 0. We should take out of the set, unless we can come up 
+# good interpolation. NumberOfTime30.59DaysPastDueNotWorse 
+# contains "non-sense" data such as 96 and 98 use to code for some qualitative
+# quantity ("other", or "refused to say"). The same corruption is present in 
+# NumberOfTime60.89DaysPastDueNotWorse and NumberOfTimes90DaysLate
+# See tabulated values using the raw data from cs-training.csv
 table(cs.training$age)
 table(cs.training$NumberOfTime30.59DaysPastDueNotWorse)
 table(cs.training$NumberOfTimes90DaysLate)
 table(cs.training$NumberOfTime60.89DaysPastDueNotWorse)
 
-## DATA CLEANUP TODO:
-## We should think about ways to weight observations where the person did 
-## default since defaulting obs. are underrepresented in the data.
-p1 <- ggplot(cs.training) + 
-  geom_bar(aes(x = factor(SeriousDlqin2yrs), y = ..count../sum(..count..))) + 
-  ylab("Percent") + xlab("Classification")
-p1
 
-## We should impute all the data before we begin training/testing with it. 
-## Here is a naive attempt that removes the offending observations from our data.
-## We use a boosted regression tree imputation method
-all.obs <- rbind(cs.training, cs.test)[, -1] ##Gets rid of the "X" column
-View(all.obs)
+# We should think about ways to weight observations where the person did 
+# default since defaulting obs. are underrepresented in the data.
+Plot.Factor(cs.training)
 
-## make sure you demarkate factor variable
-# replace nonsense data with NA, to be filled in by imputation
-all.obs$age <- ifelse(all.obs$age == 0, NA, all.obs$age)
-all.obs$age <- as.factor(all.obs$age)
+# We should impute all the data before we begin training/testing with it. 
+# Here is a naive attempt that removes the offending observations from our data.
+# We use a boosted regression tree imputation method
+all.obs <- rbind(cs.training, cs.test)[, -1]  # Gets rid of the "X" column
+
+# make sure we demarkate factor variables so we dont get nonsense values
+# (like NumDepedents = 0.56) after imputation. 
+all.obs$age <- ifelse(all.obs$age > 0, all.obs$age, NA)
+
+all.obs$NumberOfTime30.59DaysPastDueNotWorse <- ifelse(all.obs$NumberOfTime30.59DaysPastDueNotWorse < 90,
+                                                       all.obs$NumberOfTime30.59DaysPastDueNotWorse, NA)
 
 
-all.obs$NumberOfTime30.59DaysPastDueNotWorse <- ifelse(all.obs$NumberOfTime30.59DaysPastDueNotWorse > 90,
-                                                       NA, all.obs$NumberOfTime30.59DaysPastDueNotWorse)
-all.obs$NumberOfTime30.59DaysPastDueNotWorse <- as.factor(all.obs$NumberOfTime30.59DaysPastDueNotWorse)
+all.obs$NumberOfTimes90DaysLate <- ifelse(all.obs$NumberOfTimes90DaysLate < 90, 
+                                          all.obs$NumberOfTimes90DaysLate, NA)
 
+all.obs$NumberOfTime60.89DaysPastDueNotWorse <- ifelse(all.obs$NumberOfTime60.89DaysPastDueNotWorse < 90,
+                                                       all.obs$NumberOfTime60.89DaysPastDueNotWorse, NA)
 
-all.obs$NumberOfTimes90DaysLate <- ifelse(all.obs$NumberOfTimes90DaysLate > 90, 
-                                          NA, all.obs$NumberOfTimes90DaysLate)
-all.obs$NumberOfTimes90DaysLate <- as.factor(all.obs$NumberOfTimes90DaysLate)
+# Should these all be categorical?
+all.obs$age <- factor(all.obs$age)
+all.obs$NumberOfTime30.59DaysPastDueNotWorse <- factor(all.obs$NumberOfTime30.59DaysPastDueNotWorse)
+all.obs$NumberOfOpenCreditLinesAndLoans <- factor(all.obs$NumberOfOpenCreditLinesAndLoans)
+all.obs$NumberOfTimes90DaysLate <- factor(all.obs$NumberOfTimes90DaysLate)
+all.obs$NumberRealEstateLoansOrLines <- factor(all.obs$NumberRealEstateLoansOrLines)
+all.obs$NumberOfTime60.89DaysPastDueNotWorse <- factor(all.obs$NumberOfTime60.89DaysPastDueNotWorse)
+all.obs$NumberOfDependents <- factor(all.obs$NumberOfDependents)
 
-all.obs$NumberOfTime60.89DaysPastDueNotWorse <- ifelse(all.obs$NumberOfTime60.89DaysPastDueNotWorse > 90,
-                                                       NA, all.obs$NumberOfTime60.89DaysPastDueNotWorse)
-all.obs$NumberOfTime60.89DaysPastDueNotWorse <- as.factor(all.obs$NumberOfTime60.89DaysPastDueNotWorse)
+# impute data using test data as well
+impute.cleaned <- gbmImpute(all.obs[, -1], cv.fold = 10, n.trees = 500)
+full.train <- cbind(SeriousDlqin2yrs = cs.training$SeriousDlqin2yrs, impute.cleaned$x[1:nrow(cs.training), ])
 
+# TODO: after imputation, we should make one more pass over the data to fill in dependent
+# fields; i.e. some columns are dependent on other columns and we should update
+# accordingly after cleaning things up.
 
-
-impute.cleaned <- gbmImpute(all.obs[-1, ], cv.fold = 4, n.trees = 200, max.iters = 4)
-
-## after we impute, we should make one more pass over the data to fill in dependent
-## fields; i.e. some columns are dependent on other columns and we should update
-## accordingly after cleaning things up.
-n <- nrow(impute.cleaned)
-half.cleaned <- impute.cleaned[sample(n, n/1.5), ]
-
-# split data in half and sample from it.
-train.rows <- sample(nrow(half.cleaned), floor(nrow(half.cleaned)*0.8))
-train.set <- half.cleaned[train.rows, 1:ncol(half.cleaned)]
-test.set <- half.cleaned[-train.rows, 1:ncol(half.cleaned)]
-
-## proof we actally removed offending samples
-table(train.set$age)
-table(train.set$NumberOfTime30.59DaysPastDueNotWorse)
-table(train.set$NumberOfTimes90DaysLate)
-table(train.set$NumberOfTime60.89DaysPastDueNotWorse)
+# If training takes too long, split training data up:
+split.data <- Split.Data(full.train)
+test <- split.data$test
+train <- split.data$train
 
 # let's check how defaults are distributed in these:
-p2 <- ggplot(half.cleaned) + 
-  geom_bar(aes(x = factor(SeriousDlqin2yrs), y = ..count../sum(..count..))) + 
-  ylab("Percent") + xlab("Classification")
-p3 <- ggplot(train.set) + 
-  geom_bar(aes(x = factor(SeriousDlqin2yrs), y = ..count../sum(..count..))) + 
-  ylab("Percent") + xlab("Classification")
-p2
-p3
+Plot.Factor(full.train)
+Plot.Factor(train)
 
-### Boosting: as of now we are using weak classifiers in our boosting routine and only running for
-### 100 iterations. We may want to play around with the types of classifiers that we use here
-### and may also want to play around with how long we let these guys run for.
-ada.cv <- boosting.cv(SeriousDlqin2yrs ~ ., data = train.set, control = stump)
+# TODO: Someone should tweak the settings of this random forest to see if
+# it gives us any better predictions. May also consider how we weight predictions
+# this gives us and what boosting gives us.
+rf <- randomForest(as.factor(SeriousDlqin2yrs) ~ ., data= full.train)
 
-sixteen <- rpart.control(cp=-1,maxdepth=4,minsplit=1) #16-node tree
-eight <- rpart.control(cp=-1,maxdepth=3,minsplit=1) # 8-node tree
-four <- rpart.control(cp=-1,maxdepth=2,minsplit=1) # 4-node tree
-stump <- rpart.control(cp= -1, maxdepth=1,minsplit=1) # 2-node tree
+# Boosting: as of now we are using weak classifiers in our boosting routine and only running for
+# 100 iterations. We may want to play around with the types of classifiers that we use here
+# and may also want to play around with how long we let these guys run for.
 
+thirty.two <- rpart.control(cp = -1, maxdepth = 5, minsplit = 1) #16-node tree
+sixteen <- rpart.control(cp = -1, maxdepth = 4, minsplit = 1) #16-node tree
+eight <- rpart.control(cp=-1,maxdepth=3, minsplit = 1) # 8-node tree
+four <- rpart.control(cp = -1, maxdepth = 2, minsplit = 1) # 4-node tree
+stump <- rpart.control(cp = -1, maxdepth = 1,minsplit = 1) # 2-node tree
 
-boost <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = train.set, 
-             iter = 200, test.x = test.set[ , -1], test.y = test.set[ , 1])
+boost <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+             iter = 100, test.x = test[ , -1], test.y = test[ , 1])
 
-boost.stump <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = train.set, 
-                   control = stump, iter = 200, test.x = test.set[ , -1], 
-                   test.y = test.set[ , 1])
+boost.stump <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+                   control = stump, iter = 100, test.x = test[ , -1], 
+                   test.y = test[ , 1])
 
-boost.four <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = train.set, 
-                  control = four, iter = 200, test.x = test.set[ , -1], 
-                  test.y = test.set[ , 1])
+boost.four <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+                  control = four, iter = 100, test.x = test[ , -1], 
+                  test.y = test[ , 1])
 
-boost.eight <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = train.set, 
-                   control = eight, iter = 200, test.x = test.set[ , -1], 
-                   test.y = test.set[ , 1])
+boost.eight <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+                   control = eight, iter = 100, test.x = test[ , -1], 
+                   test.y = test[ , 1])
 
-boost.sixteen <- ada(as.factor(SeriousDlqin2yrs) ~ ., data=train.set, 
-                     control = sixteen, iter = 200, test.x = test.set[ , -1],
-                     test.y = test.set[ , 1])
+boost.sixteen <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+                   control = sixteen, iter = 100, test.x = test[ , -1], 
+                   test.y = test[ , 1])
+
+boost.thirty <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+                              control = thirty.two, iter = 100, 
+                              test.x = test[ , -1], test.y = test[ , 1])
+
 ## performance plots
 varplot(boost.stump)
 plot(boost.stump)
@@ -120,6 +135,6 @@ plot(boost.eight)
 varplot(boost.sixteen)
 plot(boost.sixteen)
 
-pred <- predict(boost.four, cs.test[, -1], type = "probs")
+pred <- predict(boost.sixteen, cs.test[, -1], type = "prob")
 results <- data.frame(Id = 1:nrow(cs.test), Probability = pred[, 2])
 write.table(results, "derose.csv", quote=F, row.names=F, sep=",")
