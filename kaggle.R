@@ -37,6 +37,11 @@ table(cs.training$NumberOfTime30.59DaysPastDueNotWorse)
 table(cs.training$NumberOfTimes90DaysLate)
 table(cs.training$NumberOfTime60.89DaysPastDueNotWorse)
 
+# TODO: check for more outliers like this:
+boxplot(cs.training$RevolvingUtilizationOfUnsecuredLines, horizontal=T)
+# boxplot of each variable. Note that 98/96 are the outliers for the categories
+# mentioned above.
+apply(cs.training, 2, boxplot)
 
 # We should think about ways to weight observations where the person did 
 # default since defaulting obs. are underrepresented in the data.
@@ -135,6 +140,7 @@ plot(boost.eight)
 varplot(boost.sixteen)
 plot(boost.sixteen)
 
-pred <- predict(boost.sixteen, cs.test[, -1], type = "prob")
+pred <- predict(boost.thirty, cs.test[, -1], type = "prob")
 results <- data.frame(Id = 1:nrow(cs.test), Probability = pred[, 2])
 write.table(results, "derose.csv", quote=F, row.names=F, sep=",")
+ 
