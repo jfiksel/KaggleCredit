@@ -100,7 +100,8 @@ rf <- randomForest(as.factor(SeriousDlqin2yrs) ~ ., data= full.train)
 # Boosting: as of now we are using weak classifiers in our boosting routine and only running for
 # 100 iterations. We may want to play around with the types of classifiers that we use here
 # and may also want to play around with how long we let these guys run for.
-
+one.four <- rpart.control(cp = -1, maxdepth = 10, minsplit = 1)
+sixty.four  <- rpart.control(cp = -1, maxdepth = 6, minsplit = 1)
 thirty.two <- rpart.control(cp = -1, maxdepth = 5, minsplit = 1) #16-node tree
 sixteen <- rpart.control(cp = -1, maxdepth = 4, minsplit = 1) #16-node tree
 eight <- rpart.control(cp=-1,maxdepth=3, minsplit = 1) # 8-node tree
@@ -108,10 +109,10 @@ four <- rpart.control(cp = -1, maxdepth = 2, minsplit = 1) # 4-node tree
 stump <- rpart.control(cp = -1, maxdepth = 1,minsplit = 1) # 2-node tree
 
 boost <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
-             iter = 100, test.x = test[ , -1], test.y = test[ , 1])
+             iter = 1000, test.x = test[ , -1], test.y = test[ , 1])
 
 boost.stump <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
-                   control = stump, iter = 100, test.x = test[ , -1], 
+                   control = stump, iter = 1000, test.x = test[ , -1], 
                    test.y = test[ , 1])
 
 boost.four <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
@@ -130,6 +131,14 @@ boost.thirty <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train,
                               control = thirty.two, iter = 100, 
                               test.x = test[ , -1], test.y = test[ , 1])
 
+  boost.sixty <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+                      control = sixty.four, iter = 400, 
+                      test.x = test[ , -1], test.y = test[ , 1])
+  
+  boost.ten <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+                   control = one.four, iter = 1000, 
+                   test.x = test[ , -1], test.y = test[ , 1])
+
 ## performance plots
 varplot(boost.stump)
 plot(boost.stump)
@@ -140,7 +149,7 @@ plot(boost.eight)
 varplot(boost.sixteen)
 plot(boost.sixteen)
 
-pred <- predict(boost.thirty, cs.test[, -1], type = "prob")
+pred <- predict(boost.ten, cs.test[, -1], type = "probs")
 results <- data.frame(Id = 1:nrow(cs.test), Probability = pred[, 2])
 write.table(results, "derose.csv", quote=F, row.names=F, sep=",")
  
