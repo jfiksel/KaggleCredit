@@ -143,4 +143,40 @@ plot(boost.sixteen)
 pred <- predict(boost.thirty, cs.test[, -1], type = "prob")
 results <- data.frame(Id = 1:nrow(cs.test), Probability = pred[, 2])
 write.table(results, "derose.csv", quote=F, row.names=F, sep=",")
+
+library(GA)
+library(ROCR)
+
+# pred1,pred2,pred3 are predicted probabilities from different
+# models (e.g. boosting, random forest and svm)
+# TODO: we need to obtain the actual data
+# we can train these models with the training data
+# except for a small subset and predict the subset
+pred1 <- runif(1000)
+pred2 <- rnorm(1000)
+pred3 <- runif(1000)
+# label is the vector of true values {0,1}
+label <- runif(1000)
+label[label < 0.5] <- 0
+label[label > 0.5] <- 1
+
+# The fitness function for the genetic algorithm
+# calculates the AUC 
+# w1,w2,w3 are weights
+Fitness <- function(w1,w2) {
+  w3 <- 1 - w1 - w2
+  pred <- prediction(w1*pred1 + w2*pred2 + w3*pred3,label)
+  auc <- performance(pred,"auc")
+  auc <- unlist(slot(auc, "y.values"))
+  return (1 - auc)
+}
+
+# The genetic algorithm finds the optimal weights
+# The range of w1,w2 is [0,0.5]
+# There are quite a few parameters we can play with
+GA <- ga(type = "real-valued",fitness = 
+  function(x) - Fitness(x[1],x[2]), 
+  min = c(0,0), max = c(0.5,0.5))
+
+summary(GA)
  
