@@ -5,6 +5,8 @@ library(adabag)
 library(ggplot2)
 library(randomForest)
 library(imputation)
+library(GA)
+library(ROCR)
 
 Plot.Factor <- function(data) {
   # Plot.Factor plots a histogram comparing the percent
@@ -153,8 +155,6 @@ pred <- predict(boost.ten, cs.test[, -1], type = "probs")
 results <- data.frame(Id = 1:nrow(cs.test), Probability = pred[, 2])
 write.table(results, "derose.csv", quote=F, row.names=F, sep=",")
 
-library(GA)
-library(ROCR)
 
 # pred1,pred2,pred3 are predicted probabilities from different
 # models (e.g. boosting, random forest and svm)
