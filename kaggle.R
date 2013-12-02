@@ -76,14 +76,6 @@ all.obs$NumberOfTimes90DaysLate <- ifelse(all.obs$NumberOfTimes90DaysLate < 90,
 all.obs$NumberOfTime60.89DaysPastDueNotWorse <- ifelse(all.obs$NumberOfTime60.89DaysPastDueNotWorse < 90,
                                                        all.obs$NumberOfTime60.89DaysPastDueNotWorse, NA)
 
-# Should these all be categorical?
-all.obs$age <- factor(all.obs$age)
-all.obs$NumberOfTime30.59DaysPastDueNotWorse <- factor(all.obs$NumberOfTime30.59DaysPastDueNotWorse)
-all.obs$NumberOfOpenCreditLinesAndLoans <- factor(all.obs$NumberOfOpenCreditLinesAndLoans)
-all.obs$NumberOfTimes90DaysLate <- factor(all.obs$NumberOfTimes90DaysLate)
-all.obs$NumberRealEstateLoansOrLines <- factor(all.obs$NumberRealEstateLoansOrLines)
-all.obs$NumberOfTime60.89DaysPastDueNotWorse <- factor(all.obs$NumberOfTime60.89DaysPastDueNotWorse)
-all.obs$NumberOfDependents <- factor(all.obs$NumberOfDependents)
 
 # impute data using test data as well
 impute.cleaned <- gbmImpute(all.obs[, -1]) #, cv.fold = 10, n.trees = 500)
