@@ -86,10 +86,6 @@ all.obs$DebtRatio <- ifelse(is.na(all.obs$MonthlyIncome), NA, all.obs$DebtRatio)
 impute.cleaned <- gbmImpute(all.obs[, -1], cv.fold = 5, n.trees = 500)
 full.train <- cbind(SeriousDlqin2yrs = cs.training$SeriousDlqin2yrs, impute.cleaned$x[1:nrow(cs.training), ])
 
-# TODO: after imputation, we should make one more pass over the data to fill in dependent
-# fields; i.e. some columns are dependent on other columns and we should update
-# accordingly after cleaning things up.
-
 # If training takes too long, split training data up:
 split.data <- Split.Data(full.train)
 test <- split.data$test
