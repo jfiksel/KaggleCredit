@@ -128,17 +128,6 @@ boost.sixteen <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train,
                    control = sixteen, iter = 100, test.x = test[ , -1], 
                    test.y = test[ , 1])
 
-boost.thirty <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
-                              control = thirty.two, iter = 100, 
-                              test.x = test[ , -1], test.y = test[ , 1])
-
-boost.sixty <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
-                      control = sixty.four, iter = 400, 
-                      test.x = test[ , -1], test.y = test[ , 1])
-  
-boost.ten <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
-                   control = one.four, iter = 1000, 
-                   test.x = test[ , -1], test.y = test[ , 1])
 
 ## performance plots
 varplot(boost.stump)
@@ -152,7 +141,7 @@ plot(boost.sixteen)
 
 pred <- predict(boost.ten, cs.test[, -1], type = "probs")
 results <- data.frame(Id = 1:nrow(cs.test), Probability = pred[, 2])
-write.table(results, "derose.csv", quote=F, row.names=F, sep=",")
+write.table(full.train, "imputed.csv", quote=F, row.names=F, sep=",")
 
 
 # pred1,pred2,pred3 are predicted probabilities from different
@@ -171,10 +160,10 @@ label[label > 0.5] <- 1
 # The fitness function for the genetic algorithm
 # calculates the AUC 
 # w1,w2,w3 are weights
-Fitness <- function(w1,w2) {
-  w3 <- 1 - w1 - w2
-  pred <- prediction(w1*pred1 + w2*pred2 + w3*pred3,label)
-  auc <- performance(pred,"auc")
+Fitness <- function(w1) {
+  w2 <- 1 - w1
+  pred <- prediction(w1 * pred1 + w2 * pred2, label)
+  auc <- performance(pred, "auc")
   auc <- unlist(slot(auc, "y.values"))
   return (1 - auc)
 }
@@ -182,9 +171,8 @@ Fitness <- function(w1,w2) {
 # The genetic algorithm finds the optimal weights
 # The range of w1,w2 is [0,0.5]
 # There are quite a few parameters we can play with
-GA <- ga(type = "real-valued",fitness = 
-  function(x) - Fitness(x[1],x[2]), 
-  min = c(0,0), max = c(0.5,0.5))
+GA <- ga(type = "real-valued", 
+         fitness = function(x) - Fitness(x), min = 0, max = 1)
 
 summary(GA)
  
