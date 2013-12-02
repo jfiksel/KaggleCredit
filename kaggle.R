@@ -21,15 +21,8 @@ Split.Data <-function(data, size) {
   # Split.Data partitions a full dataset into two smaller
   # ones that may be used for training/testing.
   n <- nrow(data)
-  prob <- c()
-  for (i in 1:n) {
-    if (data[i, 2] == 1 ) {
-        prob[i] <- 0.15
-    } else {
-      prob[i] <- 0.015
-    }
-  }
-  prob.sampled <- data[sample(n, n/size, prob = prob, replace = TRUE), 
+  prob <- ifelse(data$SeriousDlqin2yrs == 1, 0.15, 0.015)
+  prob.sampled <- data[sample(n, n / size, prob = prob, replace = TRUE), ] 
   return(prob.sampled)
 }
 
@@ -45,7 +38,7 @@ table(cs.training$NumberOfTimes90DaysLate)
 table(cs.training$NumberOfTime60.89DaysPastDueNotWorse)
 
 # TODO: check for more outliers like this:
-boxplot(cs.training$RevolvingUtilizationOfUnsecuredLines, horizontal=T)
+boxplot(cs.training$RevolvingUtilizationOfUnsecuredLines, horizontal = T)
 # boxplot of each variable. Note that 98/96 are the outliers for the categories
 # mentioned above.
 apply(cs.training, 2, boxplot)
@@ -59,8 +52,7 @@ Plot.Factor(cs.training)
 # We use a boosted regression tree imputation method
 all.obs <- rbind(cs.training, cs.test)[ , -1]  # Gets rid of the "X" column
 
-# make sure we demarkate factor variables so we dont get nonsense values
-# (like NumDepedents = 0.56) after imputation. 
+# filter nonsense variables
 all.obs$age <- ifelse(all.obs$age > 0, all.obs$age, NA)
 
 all.obs$RevolvingUtilizationOfUnsecuredLines <- ifelse(all.obs$RevolvingUtilizationOfUnsecuredLines < 40000,
@@ -85,46 +77,41 @@ full.train <- cbind(SeriousDlqin2yrs = cs.training$SeriousDlqin2yrs, # add repon
                     impute.cleaned$x[1:nrow(cs.training), ]) 
 
 # If training takes too long, split training data up:
-split.data <- Split.Data(full.train, 1.5)
-test <- split.data$test
-train <- split.data$train
+unskew.data <- Split.Data(full.train, 1)
 
 # let's check how defaults are distributed in these:
-Plot.Factor(full.train)
-Plot.Factor(train)
+Plot.Factor(unskew.data)
+Plot.Factor(all.obs[0:nrow(cs.training), ])
 
 # TODO: Someone should tweak the settings of this random forest to see if
 # it gives us any better predictions. May also consider how we weight predictions
 # this gives us and what boosting gives us.
 rf <- randomForest(as.factor(SeriousDlqin2yrs) ~ ., data = full.train)
 
-# Boosting: as of now we are using weak classifiers in our boosting routine and only running for
-# 100 iterations. We may want to play around with the types of classifiers that we use here
-# and may also want to play around with how long we let these guys run for.
-one.four <- rpart.control(cp = -1, maxdepth = 10, minsplit = 1)
-sixty.four  <- rpart.control(cp = -1, maxdepth = 6, minsplit = 1)
-thirty.two <- rpart.control(cp = -1, maxdepth = 5, minsplit = 1) #16-node tree
+# Boosting: as of now we are using weak classifiers in our boosting routine and 
+# only running for 100 iterations.; may want to bump that up if we see
+# the need to
 sixteen <- rpart.control(cp = -1, maxdepth = 4, minsplit = 1) #16-node tree
 eight <- rpart.control(cp=-1,maxdepth=3, minsplit = 1) # 8-node tree
 four <- rpart.control(cp = -1, maxdepth = 2, minsplit = 1) # 4-node tree
 stump <- rpart.control(cp = -1, maxdepth = 1,minsplit = 1) # 2-node tree
 
-boost <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
-             iter = 1000, test.x = test[ , -1], test.y = test[ , 1])
+boost <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, 
+             iter = 100, test.x = test[ , -1], test.y = test[ , 1])
 
-boost.stump <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
-                   control = stump, iter = 1000, test.x = test[ , -1], 
+boost.stump <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, 
+                   control = stump, iter = 100, test.x = test[ , -1], 
                    test.y = test[ , 1])
 
-boost.four <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+boost.four <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, 
                   control = four, iter = 100, test.x = test[ , -1], 
                   test.y = test[ , 1])
 
-boost.eight <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+boost.eight <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, 
                    control = eight, iter = 100, test.x = test[ , -1], 
                    test.y = test[ , 1])
 
-boost.sixteen <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+boost.sixteen <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, 
                    control = sixteen, iter = 100, test.x = test[ , -1], 
                    test.y = test[ , 1])
 
@@ -132,14 +119,10 @@ boost.sixteen <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train,
 ## performance plots
 varplot(boost.stump)
 plot(boost.stump)
-varplot(boost.four)
-plot(boost.four)
-varplot(boost.eight)
-plot(boost.eight)
-varplot(boost.sixteen)
-plot(boost.sixteen)
 
-pred <- predict(boost.ten, cs.test[, -1], type = "probs")
+pred <- predict(boost.sixteen, 
+                impute.cleaned$x[(nrow(cs.training) + 1):nrow(impute.cleaned$x), ], 
+                type = "probs")
 results <- data.frame(Id = 1:nrow(cs.test), Probability = pred[, 2])
 write.table(full.train, "imputed.csv", quote=F, row.names=F, sep=",")
 
