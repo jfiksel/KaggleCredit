@@ -21,7 +21,15 @@ Split.Data <-function(data) {
   # Split.Data partitions a full dataset into two smaller
   # ones that may be used for training/testing.
   n <- nrow(data)
-  half.cleaned <- data[sample(n, n/1.5), ]
+  prob <- c()
+  for (i in 1:nrow(data)) {
+    if (data[i, 2] == 1 ) {
+        prob[i] <- 0.15
+    } else {
+      prob[i] <- 0.015
+    }
+  }
+  half.cleaned <- data[sample(n, n/1.5), prob = prob]
   train.rows <- sample(nrow(half.cleaned), floor(nrow(half.cleaned)*0.8))
   train.set <- half.cleaned[train.rows, 1:ncol(half.cleaned)]
   test.set <- half.cleaned[-train.rows, 1:ncol(half.cleaned)]
@@ -78,7 +86,7 @@ all.obs$NumberOfTime60.89DaysPastDueNotWorse <- factor(all.obs$NumberOfTime60.89
 all.obs$NumberOfDependents <- factor(all.obs$NumberOfDependents)
 
 # impute data using test data as well
-impute.cleaned <- gbmImpute(all.obs[, -1], cv.fold = 10, n.trees = 500)
+impute.cleaned <- gbmImpute(all.obs[, -1]) #, cv.fold = 10, n.trees = 500)
 full.train <- cbind(SeriousDlqin2yrs = cs.training$SeriousDlqin2yrs, impute.cleaned$x[1:nrow(cs.training), ])
 
 # TODO: after imputation, we should make one more pass over the data to fill in dependent
@@ -133,11 +141,11 @@ boost.thirty <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train,
                               control = thirty.two, iter = 100, 
                               test.x = test[ , -1], test.y = test[ , 1])
 
-  boost.sixty <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+boost.sixty <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
                       control = sixty.four, iter = 400, 
                       test.x = test[ , -1], test.y = test[ , 1])
   
-  boost.ten <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
+boost.ten <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = full.train, 
                    control = one.four, iter = 1000, 
                    test.x = test[ , -1], test.y = test[ , 1])
 
