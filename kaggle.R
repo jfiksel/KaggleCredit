@@ -29,11 +29,8 @@ Split.Data <-function(data, size) {
       prob[i] <- 0.015
     }
   }
-  half.cleaned <- data[sample(n, n/size, prob = prob), ]
-  train.rows <- sample(nrow(half.cleaned), floor(nrow(half.cleaned)*0.8))
-  train.set <- half.cleaned[train.rows, 1:ncol(half.cleaned)]
-  test.set <- half.cleaned[-train.rows, 1:ncol(half.cleaned)]
-  return(list("train" = train.set, "test" = test.set))
+  prob.sampled <- data[sample(n, n/size, prob = prob, replace = TRUE), 
+  return(prob.sampled)
 }
 
 # Someone has age 0. We should take out of the set, unless we can come up 
@@ -82,12 +79,13 @@ all.obs$NumberOfTime60.89DaysPastDueNotWorse <- ifelse(all.obs$NumberOfTime60.89
 all.obs$DebtRatio <- ifelse(is.na(all.obs$MonthlyIncome), NA, all.obs$DebtRatio)
 
 
-# impute data using test data as well
-impute.cleaned <- gbmImpute(all.obs[, -1], cv.fold = 5, n.trees = 500)
-full.train <- cbind(SeriousDlqin2yrs = cs.training$SeriousDlqin2yrs, impute.cleaned$x[1:nrow(cs.training), ])
+# impute data using test and training data; ignore response
+impute.cleaned <- gbmImpute(all.obs[, -1], cv.fold = 5, n.trees = 500) 
+full.train <- cbind(SeriousDlqin2yrs = cs.training$SeriousDlqin2yrs, # add reponse back to dataframe
+                    impute.cleaned$x[1:nrow(cs.training), ]) 
 
 # If training takes too long, split training data up:
-split.data <- Split.Data(full.train)
+split.data <- Split.Data(full.train, 1.5)
 test <- split.data$test
 train <- split.data$train
 
@@ -98,7 +96,7 @@ Plot.Factor(train)
 # TODO: Someone should tweak the settings of this random forest to see if
 # it gives us any better predictions. May also consider how we weight predictions
 # this gives us and what boosting gives us.
-rf <- randomForest(as.factor(SeriousDlqin2yrs) ~ ., data= full.train)
+rf <- randomForest(as.factor(SeriousDlqin2yrs) ~ ., data = full.train)
 
 # Boosting: as of now we are using weak classifiers in our boosting routine and only running for
 # 100 iterations. We may want to play around with the types of classifiers that we use here
