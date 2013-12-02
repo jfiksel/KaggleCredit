@@ -60,7 +60,7 @@ Plot.Factor(cs.training)
 # We should impute all the data before we begin training/testing with it. 
 # Here is a naive attempt that removes the offending observations from our data.
 # We use a boosted regression tree imputation method
-all.obs <- rbind(cs.training, cs.test)[, -1]  # Gets rid of the "X" column
+all.obs <- rbind(cs.training, cs.test)[ , -1]  # Gets rid of the "X" column
 
 # make sure we demarkate factor variables so we dont get nonsense values
 # (like NumDepedents = 0.56) after imputation. 
@@ -79,9 +79,11 @@ all.obs$NumberOfTimes90DaysLate <- ifelse(all.obs$NumberOfTimes90DaysLate < 90,
 all.obs$NumberOfTime60.89DaysPastDueNotWorse <- ifelse(all.obs$NumberOfTime60.89DaysPastDueNotWorse < 90,
                                                        all.obs$NumberOfTime60.89DaysPastDueNotWorse, NA)
 
+all.obs$DebtRatio <- ifelse(is.na(all.obs$MonthlyIncome), NA, all.obs$DebtRatio)
+
 
 # impute data using test data as well
-impute.cleaned <- gbmImpute(all.obs[, -1]) #, cv.fold = 10, n.trees = 500)
+impute.cleaned <- gbmImpute(all.obs[, -1], cv.fold = 5, n.trees = 500)
 full.train <- cbind(SeriousDlqin2yrs = cs.training$SeriousDlqin2yrs, impute.cleaned$x[1:nrow(cs.training), ])
 
 # TODO: after imputation, we should make one more pass over the data to fill in dependent
