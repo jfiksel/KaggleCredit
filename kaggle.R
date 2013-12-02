@@ -17,19 +17,19 @@ Plot.Factor <- function(data) {
   p1
 }
 
-Split.Data <-function(data) {
+Split.Data <-function(data, size) {
   # Split.Data partitions a full dataset into two smaller
   # ones that may be used for training/testing.
   n <- nrow(data)
   prob <- c()
-  for (i in 1:nrow(data)) {
+  for (i in 1:n) {
     if (data[i, 2] == 1 ) {
         prob[i] <- 0.15
     } else {
       prob[i] <- 0.015
     }
   }
-  half.cleaned <- data[sample(n, n/1.5), prob = prob]
+  half.cleaned <- data[sample(n, n/size, prob = prob), ]
   train.rows <- sample(nrow(half.cleaned), floor(nrow(half.cleaned)*0.8))
   train.set <- half.cleaned[train.rows, 1:ncol(half.cleaned)]
   test.set <- half.cleaned[-train.rows, 1:ncol(half.cleaned)]
@@ -65,6 +65,9 @@ all.obs <- rbind(cs.training, cs.test)[, -1]  # Gets rid of the "X" column
 # make sure we demarkate factor variables so we dont get nonsense values
 # (like NumDepedents = 0.56) after imputation. 
 all.obs$age <- ifelse(all.obs$age > 0, all.obs$age, NA)
+
+all.obs$RevolvingUtilizationOfUnsecuredLines <- ifelse(all.obs$RevolvingUtilizationOfUnsecuredLines < 40000,
+                                                       all.obs$RevolvingUtilizationOfUnsecuredLines, NA)
 
 all.obs$NumberOfTime30.59DaysPastDueNotWorse <- ifelse(all.obs$NumberOfTime30.59DaysPastDueNotWorse < 90,
                                                        all.obs$NumberOfTime30.59DaysPastDueNotWorse, NA)
