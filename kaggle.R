@@ -73,6 +73,7 @@ all.obs$DebtRatio <- ifelse(is.na(all.obs$MonthlyIncome), NA, all.obs$DebtRatio)
 
 # impute data using test and training data; ignore response
 impute.cleaned <- gbmImpute(all.obs[, -1], cv.fold = 5, max.iters = 3)
+knn.impute <- kNNImpute(all.obs[, -1], cv.fold = 5, max.iters = 3)
 full.train <- cbind(SeriousDlqin2yrs = cs.training$SeriousDlqin2yrs, # add reponse back to dataframe
                     impute.cleaned$x[1:nrow(cs.training), ]) 
 full.test <- cbind(SeriousDlqin2yrs = cs.test$SeriousDlqin2yrs,
