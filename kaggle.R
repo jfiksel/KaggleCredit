@@ -55,7 +55,7 @@ all.obs <- rbind(cs.training, cs.test)[ , -1]  # Gets rid of the "X" column
 # filter nonsense variables
 all.obs$age <- ifelse(all.obs$age > 0, all.obs$age, NA)
 
-all.obs$RevolvingUtilizationOfUnsecuredLines <- ifelse(all.obs$RevolvingUtilizationOfUnsecuredLines < 40000,
+all.obs$RevolvingUtilizationOfUnsecuredLines <- ifelse(all.obs$RevolvingUtilizationOfUnsecuredLines <= 1,
                                                        all.obs$RevolvingUtilizationOfUnsecuredLines, NA)
 
 all.obs$NumberOfTime30.59DaysPastDueNotWorse <- ifelse(all.obs$NumberOfTime30.59DaysPastDueNotWorse < 90,
@@ -72,9 +72,11 @@ all.obs$DebtRatio <- ifelse(is.na(all.obs$MonthlyIncome), NA, all.obs$DebtRatio)
 
 
 # impute data using test and training data; ignore response
-impute.cleaned <- gbmImpute(all.obs[, -1], cv.fold = 5, n.trees = 500) 
+impute.cleaned <- gbmImpute(all.obs[, -1], cv.fold = 5, max.iters = 3)
 full.train <- cbind(SeriousDlqin2yrs = cs.training$SeriousDlqin2yrs, # add reponse back to dataframe
                     impute.cleaned$x[1:nrow(cs.training), ]) 
+full.test <- cbind(SeriousDlqin2yrs = cs.test$SeriousDlqin2yrs,
+                   impute.cleaned$x[c(-1:-nrow(cs.training)), ])
 
 # If training takes too long, split training data up:
 unskew.data <- Split.Data(full.train, 1)
@@ -86,66 +88,50 @@ Plot.Factor(all.obs[0:nrow(cs.training), ])
 # TODO: Someone should tweak the settings of this random forest to see if
 # it gives us any better predictions. May also consider how we weight predictions
 # this gives us and what boosting gives us.
-rf <- randomForest(as.factor(SeriousDlqin2yrs) ~ ., data = full.train)
+rf <- randomForest(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data)
+
+# Naive Bayes
+nb <- naiveBayes(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data)
 
 # Boosting: as of now we are using weak classifiers in our boosting routine and 
 # only running for 100 iterations.; may want to bump that up if we see
 # the need to
+thirty <- rpart.control(cp = -1, maxdepth = 5, minsplit = 1) #16-node tree
 sixteen <- rpart.control(cp = -1, maxdepth = 4, minsplit = 1) #16-node tree
 eight <- rpart.control(cp=-1,maxdepth=3, minsplit = 1) # 8-node tree
 four <- rpart.control(cp = -1, maxdepth = 2, minsplit = 1) # 4-node tree
 stump <- rpart.control(cp = -1, maxdepth = 1,minsplit = 1) # 2-node tree
 
-boost <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, 
-             iter = 100, test.x = test[ , -1], test.y = test[ , 1])
+boost <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, iter = 100)
 
 boost.stump <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, 
-                   control = stump, iter = 100, test.x = test[ , -1], 
-                   test.y = test[ , 1])
+                   control = stump, iter = 100)
 
 boost.four <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, 
-                  control = four, iter = 100, test.x = test[ , -1], 
-                  test.y = test[ , 1])
+                  control = four, iter = 100)
 
 boost.eight <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, 
-                   control = eight, iter = 100, test.x = test[ , -1], 
-                   test.y = test[ , 1])
+                   control = eight, iter = 100)
 
 boost.sixteen <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, 
-                   control = sixteen, iter = 100, test.x = test[ , -1], 
-                   test.y = test[ , 1])
+                   control = sixteen, iter = 100)
+
+boost.thirty  <- ada(as.factor(SeriousDlqin2yrs) ~ ., data = unskew.data, 
+                     control = thirty, iter = 100)
 
 
-## performance plots
-varplot(boost.stump)
-plot(boost.stump)
-
-pred <- predict(boost.sixteen, 
-                impute.cleaned$x[(nrow(cs.training) + 1):nrow(impute.cleaned$x), ], 
-                type = "probs")
-results <- data.frame(Id = 1:nrow(cs.test), Probability = pred[, 2])
-write.table(full.train, "imputed.csv", quote=F, row.names=F, sep=",")
-
-
-# pred1,pred2,pred3 are predicted probabilities from different
-# models (e.g. boosting, random forest and svm)
-# TODO: we need to obtain the actual data
-# we can train these models with the training data
-# except for a small subset and predict the subset
-pred1 <- runif(1000)
-pred2 <- rnorm(1000)
-pred3 <- runif(1000)
-# label is the vector of true values {0,1}
-label <- runif(1000)
-label[label < 0.5] <- 0
-label[label > 0.5] <- 1
-
+boost.train.pred <- predict(boost.sixteen, full.train, type = "prob")
+forest.train.pred <- predict(rf, full.train, type = "prob" )
+bayes.train.pred <- predict(nb, full.train, type = "raw")
+all.pred <- data.frame(bayes.train.pred[, 2], forest.train.pred[ , 2], 
+                       boost.train.pred[ , 2])
+  
 # The fitness function for the genetic algorithm
 # calculates the AUC 
 # w1,w2,w3 are weights
-Fitness <- function(w1) {
-  w2 <- 1 - w1
-  pred <- prediction(w1 * pred1 + w2 * pred2, label)
+Fitness <- function(x, guess) {
+  w <- x / sum(x)
+  pred <- prediction(as.matrix(guess) %*% w , full.train[, 1])
   auc <- performance(pred, "auc")
   auc <- unlist(slot(auc, "y.values"))
   return (1 - auc)
@@ -154,8 +140,18 @@ Fitness <- function(w1) {
 # The genetic algorithm finds the optimal weights
 # The range of w1,w2 is [0,0.5]
 # There are quite a few parameters we can play with
-GA <- ga(type = "real-valued", 
-         fitness = function(x) - Fitness(x), min = 0, max = 1)
-
+GA <- ga(type = "real-valued",fitness = Fitness, maxiter = 10, guess = all.pred,
+         min = c(0, 0, 0), max = c(1,1,1))
 summary(GA)
- 
+weights <- c(0.6520063, 0.006869555, 0.3802973)
+weights <- weights / sum(weights)
+
+boost.test.pred <- predict(boost.sixteen, full.test, type = "prob")
+forest.test.pred <- predict(rf, full.test, type = "prob" )
+bayes.test.pred <- predict(nb, full.test, type = "raw")
+all.pred <- data.frame(bayes.test.pred[, 2], forest.test.pred[ , 2], 
+                       boost.test.pred[ , 2])
+final.test.pred <- as.matrix(all.pred) %*% weights
+results <- data.frame(Id = 1:nrow(cs.test), Probability = final.test.pred)
+write.table(results, "imputed.csv", quote=F, row.names=F, sep=",")
+
