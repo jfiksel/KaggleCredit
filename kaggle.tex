@@ -8,7 +8,7 @@
 \usepackage{amssymb}
 
 \title{Kaggle my Baggle}
-\author{Alex Kellog, Bill DeRose, Jacob Fiksel, Lingge Li}
+\author{Alex Kellogg, Bill DeRose, Jacob Fiksel, Lingge Li}
 %\date{}							% Activate to display a given date or no date
 
 
@@ -17,6 +17,14 @@
 \section{Introduction}
 \section{Clean Up}
 	\subsection{Outliers}
+	We begin our exploration of the data with summary statistics and plots. One of 
+	the first anomolies we noticed was the presence of the values $96$ and $98$ 
+	in the predictor variables. After doing some digging, we realized that 
+	these quantitative values were used to code for qualitative values such as 
+	``failed to answer or ``not applicable". We simply replaced these observations with
+	\tt NA\rm~and let the imputation deal with the rest.
+	
+	Upon further inspection, we noted that some of the values for \tt RevolvingUtilizationOfUnsecuredLines
 	\subsection{Imputation}
 \section{Classifiers}
 	\subsection{Naive Bayes}
