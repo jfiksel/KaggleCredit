@@ -3,7 +3,7 @@
 \geometry{letterpaper}                   		% ... or a4paper or a5paper or ... 
 %\geometry{landscape}                		% Activate for for rotated page geometry
 %\usepackage[parfill]{parskip}    		% Activate to begin paragraphs with an empty line rather than an indent
-\usepackage{graphicx}				% Use pdf, png, jpg, or eps� with pdflatex; use eps in DVI mode
+\usepackage{graphicx}				% Use pdf, png, jpg, or eps� with pdflatex; use eps in DVI mode
 								% TeX will automatically convert eps --> pdf in pdflatex		
 \usepackage{amssymb}
 
@@ -15,6 +15,15 @@
 \begin{document}
 \maketitle
 \section{Introduction}
+	Defaulting on loans played an integral role in the crumbling of the financial industry in the great recession of 2007-2008. The housing bubble was booming and banks wanted a share in the lucrative profits, so they engaged in misdirected and extremely risky lending practices (subprime mortgages, for example, which involve lending money to borrowers with lower credit ratings). As more and more banks engaged in these loans, the competition grew fierce (and the stakes were extremely high), which resulted in the institutions further relaxing their standards of credit worthiness. Banks were lending out way more than they could pay back. Finally, the subprime lending caught up with the banks, and all at once, a sea of people who were all classified as likely to default did indeed default. A few months later, the world faced the harshest recession since the 1930s. As a result of this default spiral, banks and regulators have started to pay special attention to estimating the likelihood of default (as well as its potential maximal costs). 
+Enter Kaggle’s “Give Me Some Credit” competition. In this statistical modeling competition, we are provided with data from 150,000 people in 12 dimensions, including revolving utilization, monthly income, debt ratio, age, number of dependents, number of times late in paying loans, and number of real estate loans. With all this data, the goal is to train an algorithm to classify people as one of two types: serious delinquency in 2 years, or not – essentially, we are looking to asses the likelihood of default based on the factors mentioned above.
+
+Data Cleanup and Scrutiny
+
+The first, and arguably the most important, thing we did was examine and interpret the data. It did not take long to realize that there are a plethora of “NA” values, an issue we would certainly need to address in order to have better predictions (see Imputation Section). After a little more scrutiny in the form of creating box plots of each of the respective variables, we noticed a number of outliers. For example, someone was aged 0 and another was receiving several million dollars in monthly income (what industry is that in, please?). As a group, we decided to look into each of the variables and really think about the feasibility of the outlying values that we were observing. In doing so, we came to a couple of major realizations that helped boost our Kaggle score. 
+The first key observation, and certainly the most significant of the three, was that 96\% of our data had a value of 0 in the field which we were to predict. Thus, each time we trained our data, the majority of the training was done on observations that would ultimately yield a value of zero (ie we could be 96\% correct by guessing 0’s for all values). We were noticing a large number of false negatives (predicted not to default, but did indeed default – the worst kind of error in this case), and decided that it would behoove us to train more of the data on people who did indeed default. Thus, we decided to weight the observations with a value of 1 in serious delinquency in 2 years more heavily than those with a 0. The way we did this was by creating a vector of probabilities, and assigning observations with a value of 1 a higher probability of being selected than those with a value of 0. In manipulating these weights, we were able to take subsets of our data (with resampling) with 40\% of this training data having defaulted. 
+Next, we observed a dependency between debt ratio and monthly income (the former is a function of the latter). We had noticed, in both the box plots and a scatter plot of debt ratio vs monthly income, that low and NA values of monthly income were highly associated with large debt ratios. Our main concern was with the NA values – which produced a large percentage of the outliers, and so we proceeded to replace the debt ratios given to NA for every given monthly income value of NA. This got rid of a large number of the number of outliers.
+
 \section{Clean Up}
 	\subsection{Outliers}
 	We begin our exploration of the data with summary statistics and plots. One of 
